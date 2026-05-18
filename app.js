@@ -155,7 +155,7 @@ function showToast(message, type = "info") {
 }
 
 function updateProgress(current, total) {
-  const percent = Math.round((current / total) * 100);
+  const percent = total > 0 ? Math.round((current / total) * 100) : 0;
   document.getElementById("progressBar").style.width = percent + "%";
   document.getElementById("progressPercent").textContent = percent + "%";
 }
@@ -216,17 +216,17 @@ function updateButtonStates() {
   
   document.getElementById("generateBasicBtn").disabled = !hasFile || !hasBasicRules;
   document.getElementById("generateAdvBtn").disabled = !hasFile || !hasAdvRules;
-  document.getElementById("clearBasicBtn").disabled = lastResult === "";
+  document.getElementById("clearBtn").disabled = lastResult === "" && !hasFile;
   document.getElementById("downloadBtn").disabled = lastResult === "";
   document.getElementById("copyBtn").disabled = lastResult === "";
 }
 
-function switchTab(tab) {
+function switchTab(tab, tabButton) {
   document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".tab-button").forEach(el => el.classList.remove("active"));
   
   document.getElementById(tab).classList.add("active");
-  event.target.classList.add("active");
+  tabButton.classList.add("active");
 }
 
 function filterRules(tab) {
@@ -328,16 +328,69 @@ async function generateVariants(mode) {
   try {
     let chosen = [];
     let customPatterns = {};
+    const chunkSizeInput = document.getElementById("chunkSize");
+    const maxResultsInput = document.getElementById("maxResults");
+    const mutationDepthInput = document.getElementById("mutationDepth");
+    const chunkSize = chunkSizeInput ? parseInt(chunkSizeInput.value, 10) : 1000;
+    const maxResults = maxResultsInput ? parseInt(maxResultsInput.value, 10) : 100000;
+    const mutationDepth = mutationDepthInput ? parseInt(mutationDepthInput.value, 10) : 2;
     
     if (mode === "custom") {
       customPatterns = {
-        suffixes: document.getElementById("customSuffixes").value.split("\n").filter(x => x.trim()),
-        prefixes: document.getElementById("customPrefixes").value.split("\n").filter(x => x.trim()),
-        separators: document.getElementById("customSeparators").value.split("\n").filter(x => x.trim())
+        suffixes: document.getElementById("customSuffixes").value.split("\n").map(x => x.trim()).filter(Boolean),
+        prefixes: document.getElementById("customPrefixes").value.split("\n").map(x => x.trim()).filter(Boolean),
+        separators: document.getElementById("customSeparators").value.split("\n").map(x => x.trim()).filter(Boolean)
       };
+      const patternsCount = customPatterns.suffixes.length + customPatterns.prefixes.length + customPatterns.separators.length;
+      if (patternsCount === 0) {
+        showToast("❌ Vui lòng nhập ít nhất một custom pattern!", "error");
+        return;
+      }
+
+      allResults.clear();
+      const total = lastData.length;
+
+      for (let i = 0; i < total && !shouldStop; i += chunkSize) {
+        const chunk = lastData.slice(i, i + chunkSize);
+
+        for (const item of chunk) {
+          if (allResults.size >= maxResults) break;
+          const pass = item.pass;
+          const user = item.user.toLowerCase();
+
+          for (const suffix of customPatterns.suffixes) {
+            if (allResults.size >= maxResults) break;
+            allResults.set(`${user}:${pass}${suffix}`, true);
+          }
+
+          for (const prefix of customPatterns.prefixes) {
+            if (allResults.size >= maxResults) break;
+            allResults.set(`${user}:${prefix}${pass}`, true);
+          }
+
+          for (const sep of customPatterns.separators) {
+            if (allResults.size >= maxResults) break;
+            const m = pass.match(/^([A-Za-z]+)(\d+)$/) || pass.match(/^(\d+)([A-Za-z]+)$/);
+            if (m) {
+              const letters = /[a-zA-Z]/.test(m[1]) ? m[1] : m[2];
+              const digits = /\d/.test(m[1]) ? m[1] : m[2];
+              allResults.set(`${user}:${letters}${sep}${digits}`, true);
+            }
+          }
+        }
+
+        updateProgress(Math.min(i + chunk.length, total), total);
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      displayResults();
+      const ratio = lastData.length > 0 ? (allResults.size / lastData.length).toFixed(1) : 0;
+      document.getElementById("statsVariants").textContent = allResults.size;
+      document.getElementById("statsRatio").textContent = ratio + "x";
+      showToast(`✅ Tạo ${allResults.size} variants từ ${lastData.length} cặp!`, "success");
+      return;
     } else {
-      const selector = mode === "basic" ? "#basicRulesContainer" : "#advancedRulesContainer";
-      chosen = Array.from(document.querySelectorAll(`${selector} input:checked`))
+      chosen = Array.from(document.querySelectorAll(`input[data-tab="${mode}"]:checked`))
         .map((c) => c.value);
       
       if (chosen.length === 0) {
@@ -356,9 +409,9 @@ async function generateVariants(mode) {
       data: lastData,
       rules: chosen,
       customPatterns: customPatterns,
-      depth: parseInt(document.getElementById("mutationDepth").value),
-      chunkSize: parseInt(document.getElementById("chunkSize").value),
-      maxResults: parseInt(document.getElementById("maxResults").value)
+      depth: mutationDepth,
+      chunkSize: chunkSize,
+      maxResults: maxResults
     };
     
     const response = await fetch("/api/generate", {
@@ -437,7 +490,9 @@ function downloadResults() {
   
   if (format === "csv") {
     content = "username,password\n" + items.map(line => {
-      const [user, pass] = line.split(":");
+      const colonIndex = line.indexOf(":");
+      const user = colonIndex === -1 ? line : line.substring(0, colonIndex);
+      const pass = colonIndex === -1 ? "" : line.substring(colonIndex + 1);
       return `"${user}","${pass}"`;
     }).join("\n");
     filename = `passwords_${Date.now()}.csv`;
@@ -485,7 +540,7 @@ function clearAll() {
   allResults.clear();
   lastData = null;
   document.getElementById("fileInput").value = "";
-  document.querySelectorAll(".rules input:checked").forEach((c) => {
+  document.querySelectorAll('input[data-tab="basic"]:checked, input[data-tab="advanced"]:checked').forEach((c) => {
     c.checked = false;
   });
   document.getElementById("output").textContent = "Chưa có dữ liệu. Vui lòng tải file lên.";
@@ -506,5 +561,8 @@ function clearAll() {
 document.addEventListener("DOMContentLoaded", () => {
   initializeUI();
   setupFileUpload();
+  document.querySelectorAll(".tab-button").forEach((button) => {
+    button.addEventListener("click", () => switchTab(button.dataset.tab, button));
+  });
   updateButtonStates();
 });
