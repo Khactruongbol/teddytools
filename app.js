@@ -216,17 +216,22 @@ function updateButtonStates() {
   
   document.getElementById("generateBasicBtn").disabled = !hasFile || !hasBasicRules;
   document.getElementById("generateAdvBtn").disabled = !hasFile || !hasAdvRules;
-  document.getElementById("clearBasicBtn").disabled = lastResult === "";
+  document.getElementById("clearBtn").disabled = lastResult === "";
   document.getElementById("downloadBtn").disabled = lastResult === "";
   document.getElementById("copyBtn").disabled = lastResult === "";
 }
 
-function switchTab(tab) {
-  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
-  
-  document.getElementById(tab).classList.add("active");
-  event.target.classList.add("active");
+function setupTabs() {
+  const tabButtons = document.querySelectorAll(".tab-button");
+  tabButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const tab = button.dataset.tab;
+      document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+      tabButtons.forEach(el => el.classList.remove("active"));
+      document.getElementById(tab).classList.add("active");
+      button.classList.add("active");
+    });
+  });
 }
 
 function filterRules(tab) {
@@ -251,6 +256,7 @@ function setupFileUpload() {
   const fileInput = document.getElementById("fileInput");
   const uploadArea = document.getElementById("uploadArea");
   
+  uploadArea.addEventListener("click", () => fileInput.click());
   fileInput.addEventListener("change", handleFileSelect);
   
   uploadArea.addEventListener("dragover", (e) => {
@@ -323,7 +329,7 @@ async function generateVariants(mode) {
   document.getElementById("generateBasicBtn").disabled = true;
   document.getElementById("generateAdvBtn").disabled = true;
   document.getElementById("stopBtn").style.display = "inline-flex";
-  document.getElementById("progressSection").classList.add("active");
+  document.getElementById("progressSection").style.display = "block";
   
   try {
     let chosen = [];
@@ -346,7 +352,7 @@ async function generateVariants(mode) {
         document.getElementById("generateBasicBtn").disabled = false;
         document.getElementById("generateAdvBtn").disabled = false;
         document.getElementById("stopBtn").style.display = "none";
-        document.getElementById("progressSection").classList.remove("active");
+        document.getElementById("progressSection").style.display = "none";
         return;
       }
     }
@@ -357,7 +363,6 @@ async function generateVariants(mode) {
       rules: chosen,
       customPatterns: customPatterns,
       depth: parseInt(document.getElementById("mutationDepth").value),
-      chunkSize: parseInt(document.getElementById("chunkSize").value),
       maxResults: parseInt(document.getElementById("maxResults").value)
     };
     
@@ -398,7 +403,7 @@ async function generateVariants(mode) {
     document.getElementById("generateBasicBtn").disabled = false;
     document.getElementById("generateAdvBtn").disabled = false;
     document.getElementById("stopBtn").style.display = "none";
-    document.getElementById("progressSection").classList.remove("active");
+    document.getElementById("progressSection").style.display = "none";
     updateButtonStates();
   }
 }
@@ -485,7 +490,7 @@ function clearAll() {
   allResults.clear();
   lastData = null;
   document.getElementById("fileInput").value = "";
-  document.querySelectorAll(".rules input:checked").forEach((c) => {
+  document.querySelectorAll("#basicRulesContainer input:checked, #advancedRulesContainer input:checked").forEach((c) => {
     c.checked = false;
   });
   document.getElementById("output").textContent = "Chưa có dữ liệu. Vui lòng tải file lên.";
@@ -505,6 +510,7 @@ function clearAll() {
 
 document.addEventListener("DOMContentLoaded", () => {
   initializeUI();
+  setupTabs();
   setupFileUpload();
   updateButtonStates();
 });
