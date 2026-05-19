@@ -675,7 +675,12 @@ body {
 /* PROGRESS BAR */
 
 .progress-section {
+  display: none;
   margin-bottom: 20px;
+}
+
+.progress-section.active {
+  display: block;
 }
 
 .progress-info {

@@ -329,7 +329,7 @@ async function generateVariants(mode) {
   document.getElementById("generateBasicBtn").disabled = true;
   document.getElementById("generateAdvBtn").disabled = true;
   document.getElementById("stopBtn").style.display = "inline-flex";
-  document.getElementById("progressSection").style.display = "block";
+  document.getElementById("progressSection").classList.add("active");
   
   try {
     let chosen = [];
@@ -352,7 +352,7 @@ async function generateVariants(mode) {
         document.getElementById("generateBasicBtn").disabled = false;
         document.getElementById("generateAdvBtn").disabled = false;
         document.getElementById("stopBtn").style.display = "none";
-        document.getElementById("progressSection").style.display = "none";
+        document.getElementById("progressSection").classList.remove("active");
         return;
       }
     }
@@ -403,7 +403,7 @@ async function generateVariants(mode) {
     document.getElementById("generateBasicBtn").disabled = false;
     document.getElementById("generateAdvBtn").disabled = false;
     document.getElementById("stopBtn").style.display = "none";
-    document.getElementById("progressSection").style.display = "none";
+    document.getElementById("progressSection").classList.remove("active");
     updateButtonStates();
   }
 }
