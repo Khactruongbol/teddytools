@@ -1,7 +1,6 @@
 // ============================================
-// CONFIG & CONSTANTS
+// CONFIG
 // ============================================
-const MAX_LENGTH = 20;
 
 const RULES_CONFIG = [
   {
@@ -116,9 +115,9 @@ const RULES_CONFIG = [
     id: 11,
     name: "🔗 Ghép & Biến đổi",
     rules: [
-      { id: "11a", label: "Thêm số cuối (111→1111)" },
-      { id: "11b", label: "Thêm số đầu (111→1111)" },
-      { id: "11c", label: "CamelCase (hello→Hello)" }
+      { id: "11a", label: "Thêm số cuối" },
+      { id: "11b", label: "Thêm số đầu" },
+      { id: "11c", label: "CamelCase" }
     ]
   },
   {
@@ -136,7 +135,6 @@ let lastResult = "";
 let allResults = new Map();
 let lastData = null;
 let isProcessing = false;
-let shouldStop = false;
 
 // ============================================
 // UTILITY FUNCTIONS
@@ -152,12 +150,6 @@ function showToast(message, type = "info") {
     toast.classList.add("hide");
     setTimeout(() => toast.remove(), 300);
   }, 3000);
-}
-
-function updateProgress(current, total) {
-  const percent = Math.round((current / total) * 100);
-  document.getElementById("progressBar").style.width = percent + "%";
-  document.getElementById("progressPercent").textContent = percent + "%";
 }
 
 // ============================================
@@ -216,17 +208,9 @@ function updateButtonStates() {
   
   document.getElementById("generateBasicBtn").disabled = !hasFile || !hasBasicRules;
   document.getElementById("generateAdvBtn").disabled = !hasFile || !hasAdvRules;
-  document.getElementById("clearBasicBtn").disabled = lastResult === "";
+  document.getElementById("clearBtn").disabled = lastResult === "";
   document.getElementById("downloadBtn").disabled = lastResult === "";
   document.getElementById("copyBtn").disabled = lastResult === "";
-}
-
-function switchTab(tab) {
-  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
-  
-  document.getElementById(tab).classList.add("active");
-  event.target.classList.add("active");
 }
 
 function filterRules(tab) {
@@ -253,9 +237,13 @@ function setupFileUpload() {
   
   fileInput.addEventListener("change", handleFileSelect);
   
+  uploadArea.addEventListener("click", () => {
+    fileInput.click();
+  });
+  
   uploadArea.addEventListener("dragover", (e) => {
     e.preventDefault();
-    uploadArea.style.background = "#f0f2f5";
+    uploadArea.style.background = "rgba(102, 126, 234, 0.2)";
   });
   
   uploadArea.addEventListener("dragleave", () => {
@@ -281,6 +269,9 @@ function handleFileSelect() {
     const content = e.target.result;
     lastData = parseFileContent(content);
     document.getElementById("statsFile").textContent = lastData.length;
+    document.getElementById("recordCount").textContent = lastData.length;
+    document.getElementById("fileSize").textContent = (file.size / 1024).toFixed(1) + " KB";
+    document.getElementById("fileStats").style.display = "grid";
     updateButtonStates();
     showToast(`✅ Tải ${lastData.length} cặp dữ liệu thành công!`, "success");
   };
@@ -307,7 +298,7 @@ function parseFileContent(content) {
 }
 
 // ============================================
-// PROCESSING - Call Backend
+// GENERATE VARIANTS
 // ============================================
 
 async function generateVariants(mode) {
@@ -318,12 +309,6 @@ async function generateVariants(mode) {
   
   if (isProcessing) return;
   isProcessing = true;
-  shouldStop = false;
-  
-  document.getElementById("generateBasicBtn").disabled = true;
-  document.getElementById("generateAdvBtn").disabled = true;
-  document.getElementById("stopBtn").style.display = "inline-flex";
-  document.getElementById("progressSection").classList.add("active");
   
   try {
     let chosen = [];
@@ -343,10 +328,6 @@ async function generateVariants(mode) {
       if (chosen.length === 0) {
         showToast("❌ Vui lòng chọn ít nhất một quy tắc!", "error");
         isProcessing = false;
-        document.getElementById("generateBasicBtn").disabled = false;
-        document.getElementById("generateAdvBtn").disabled = false;
-        document.getElementById("stopBtn").style.display = "none";
-        document.getElementById("progressSection").classList.remove("active");
         return;
       }
     }
@@ -357,7 +338,6 @@ async function generateVariants(mode) {
       rules: chosen,
       customPatterns: customPatterns,
       depth: parseInt(document.getElementById("mutationDepth").value),
-      chunkSize: parseInt(document.getElementById("chunkSize").value),
       maxResults: parseInt(document.getElementById("maxResults").value)
     };
     
@@ -383,6 +363,7 @@ async function generateVariants(mode) {
     const ratio = lastData.length > 0 ? (allResults.size / lastData.length).toFixed(1) : 0;
     document.getElementById("statsVariants").textContent = allResults.size;
     document.getElementById("statsRatio").textContent = ratio + "x";
+    document.getElementById("ratioCount").textContent = ratio + "x";
     
     showToast(
       `✅ Tạo ${allResults.size} variants từ ${lastData.length} cặp!`,
@@ -394,11 +375,6 @@ async function generateVariants(mode) {
     showToast(`❌ Lỗi: ${error.message}`, "error");
   } finally {
     isProcessing = false;
-    shouldStop = false;
-    document.getElementById("generateBasicBtn").disabled = false;
-    document.getElementById("generateAdvBtn").disabled = false;
-    document.getElementById("stopBtn").style.display = "none";
-    document.getElementById("progressSection").classList.remove("active");
     updateButtonStates();
   }
 }
@@ -416,11 +392,7 @@ function displayResults() {
   document.getElementById("output").textContent = output || "Không có kết quả.";
   document.getElementById("count").textContent = items.length;
   document.getElementById("totalCount").textContent = allResults.size;
-}
-
-function stopProcessing() {
-  shouldStop = true;
-  isProcessing = false;
+  updateButtonStates();
 }
 
 // ============================================
@@ -488,16 +460,33 @@ function clearAll() {
   document.querySelectorAll(".rules input:checked").forEach((c) => {
     c.checked = false;
   });
-  document.getElementById("output").textContent = "Chưa có dữ liệu. Vui lòng tải file lên.";
+  document.getElementById("output").textContent = "Không có kết quả. Vui lòng tải file lên.";
   document.getElementById("count").textContent = "0";
   document.getElementById("totalCount").textContent = "0";
-  document.getElementById("progressBar").style.width = "0%";
   document.getElementById("statsFile").textContent = "0";
   document.getElementById("statsVariants").textContent = "0";
   document.getElementById("statsRatio").textContent = "0x";
+  document.getElementById("ratioCount").textContent = "0x";
+  document.getElementById("fileStats").style.display = "none";
   updateButtonStates();
   showToast("🗑️ Đã xóa tất cả dữ liệu!", "info");
 }
+
+// ============================================
+// TAB SWITCHING
+// ============================================
+
+document.querySelectorAll('.tab-button').forEach(button => {
+  button.addEventListener('click', () => {
+    const tabName = button.dataset.tab;
+    
+    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    
+    button.classList.add('active');
+    document.getElementById(tabName).classList.add('active');
+  });
+});
 
 // ============================================
 // INITIALIZATION
@@ -507,21 +496,4 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeUI();
   setupFileUpload();
   updateButtonStates();
-});
-// ============================================
-// TAB SWITCHING
-// ============================================
-
-document.querySelectorAll('.tab-button').forEach(button => {
-  button.addEventListener('click', () => {
-    const tabName = button.dataset.tab;
-    
-    // Remove active from all buttons
-    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-    
-    // Add active to clicked button and corresponding tab
-    button.classList.add('active');
-    document.getElementById(tabName).classList.add('active');
-  });
 });
