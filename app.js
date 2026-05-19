@@ -2,6 +2,7 @@
 // CONFIG & CONSTANTS
 // ============================================
 const MAX_LENGTH = 20;
+const CHECKED_RULES_SELECTOR = "#basicRulesContainer input:checked, #advancedRulesContainer input:checked";
 
 const RULES_CONFIG = [
   {
@@ -490,7 +491,7 @@ function clearAll() {
   allResults.clear();
   lastData = null;
   document.getElementById("fileInput").value = "";
-  document.querySelectorAll("#basicRulesContainer input:checked, #advancedRulesContainer input:checked").forEach((c) => {
+  document.querySelectorAll(CHECKED_RULES_SELECTOR).forEach((c) => {
     c.checked = false;
   });
   document.getElementById("output").textContent = "Chưa có dữ liệu. Vui lòng tải file lên.";
